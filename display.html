@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 자막 송출</title>
+  <style>
+    :root {
+      --orig-size: 64px;
+      --orig-color: #ffffff;
+      --orig-font: Arial, sans-serif;
+      --trans-size: 68px;
+      --trans-color: #ffd166;
+      --trans-font: Arial, sans-serif;
+      --vertical-padding: 24px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      font-family: var(--orig-font);
+    }
+    .half {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--vertical-padding);
+      text-align: center;
+      width: 100%;
+    }
+    #original {
+      font-size: var(--orig-size);
+      color: var(--orig-color);
+      font-family: var(--orig-font);
+      line-height: 1.2;
+      word-break: keep-all;
+      white-space: pre-wrap;
+    }
+    #translated {
+      font-size: var(--trans-size);
+      color: var(--trans-color);
+      font-family: var(--trans-font);
+      line-height: 1.2;
+      word-break: keep-all;
+      white-space: pre-wrap;
+    }
+    .logo {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      max-width: 200px;
+      max-height: 80px;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .safe-area {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="safe-area">
+    <img id="logo" class="logo" alt="logo">
+  </div>
+  <div class="half">
+    <div id="original">원문이 여기에 표시됩니다...</div>
+  </div>
+  <div class="half">
+    <div id="translated">번역문이 여기에 표시됩니다...</div>
+  </div>
+
+  <script>
+    const LS_CONFIG_KEY = "subtitle-config";
+    const LS_PAYLOAD_KEY = "subtitle-payload";
+    const originalEl = document.getElementById("original");
+    const translatedEl = document.getElementById("translated");
+    const logoEl = document.getElementById("logo");
+
+    function applyConfig(cfg) {
+      if (!cfg) return;
+      document.documentElement.style.setProperty("--orig-size", (cfg.origSize || 64) + "px");
+      document.documentElement.style.setProperty("--orig-color", cfg.origColor || "#ffffff");
+      document.documentElement.style.setProperty("--orig-font", cfg.origFont || "Arial, sans-serif");
+      document.documentElement.style.setProperty("--trans-size", (cfg.transSize || 68) + "px");
+      document.documentElement.style.setProperty("--trans-color", cfg.transColor || "#ffd166");
+      document.documentElement.style.setProperty("--trans-font", cfg.transFont || "Arial, sans-serif");
+      document.documentElement.style.setProperty("--vertical-padding", (cfg.paddingControl || 24) + "px");
+      if (cfg.logoDataUrl) {
+        logoEl.src = cfg.logoDataUrl;
+        logoEl.style.display = "block";
+      } else {
+        logoEl.style.display = "none";
+      }
+    }
+
+    function applyPayload(payload) {
+      if (!payload) return;
+      if (payload.original !== undefined) {
+        originalEl.textContent = payload.original;
+      }
+      if (payload.translated !== undefined) {
+        translatedEl.textContent = payload.translated;
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const cfgRaw = localStorage.getItem(LS_CONFIG_KEY);
+        if (cfgRaw) applyConfig(JSON.parse(cfgRaw));
+        const payRaw = localStorage.getItem(LS_PAYLOAD_KEY);
+        if (payRaw) applyPayload(JSON.parse(payRaw));
+      } catch (e) {
+        console.error("로컬스토리지 읽기 오류", e);
+      }
+    }
+
+    window.addEventListener("storage", (event) => {
+      if (event.key === LS_CONFIG_KEY && event.newValue) {
+        applyConfig(JSON.parse(event.newValue));
+      }
+      if (event.key === LS_PAYLOAD_KEY && event.newValue) {
+        applyPayload(JSON.parse(event.newValue));
+      }
+    });
+
+    loadFromStorage();
+  </script>
+</body>
+</html>
