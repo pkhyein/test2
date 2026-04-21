@@ -1,140 +1,211 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>실시간 자막 송출</title>
-  <style>
-    :root {
-      --orig-size: 64px;
-      --orig-color: #ffffff;
-      --orig-font: Arial, sans-serif;
-      --trans-size: 68px;
-      --trans-color: #ffd166;
-      --trans-font: Arial, sans-serif;
-      --vertical-padding: 24px;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 0;
-      background: #000;
-      color: #fff;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      font-family: var(--orig-font);
-    }
-    .half {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--vertical-padding);
-      text-align: center;
-      width: 100%;
-    }
-    #original {
-      font-size: var(--orig-size);
-      color: var(--orig-color);
-      font-family: var(--orig-font);
-      line-height: 1.2;
-      word-break: keep-all;
-      white-space: pre-wrap;
-    }
-    #translated {
-      font-size: var(--trans-size);
-      color: var(--trans-color);
-      font-family: var(--trans-font);
-      line-height: 1.2;
-      word-break: keep-all;
-      white-space: pre-wrap;
-    }
-    .logo {
-      position: absolute;
-      top: 14px;
-      right: 18px;
-      max-width: 200px;
-      max-height: 80px;
-      object-fit: contain;
-      pointer-events: none;
-    }
-    .safe-area {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>베이스볼 마스터 퀴즈</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #041E42; /* 네이비 */
+            --secondary-color: #BF0D3E; /* 레드 */
+            --bg-color: #f4f4f4;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            border-top: 8px solid var(--primary-color);
+        }
+
+        .progress {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .question {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            word-break: keep-all;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 1rem;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #f0f7ff;
+            border-color: var(--primary-color);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #result {
+            display: none;
+        }
+
+        .score-text {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--secondary-color);
+            margin: 1rem 0;
+        }
+
+        .ceremony-msg {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .retry-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+        }
+    </style>
 </head>
 <body>
-  <div class="safe-area">
-    <img id="logo" class="logo" alt="logo">
-  </div>
-  <div class="half">
-    <div id="original">원문이 여기에 표시됩니다...</div>
-  </div>
-  <div class="half">
-    <div id="translated">번역문이 여기에 표시됩니다...</div>
-  </div>
 
-  <script>
-    const LS_CONFIG_KEY = "subtitle-config";
-    const LS_PAYLOAD_KEY = "subtitle-payload";
-    const originalEl = document.getElementById("original");
-    const translatedEl = document.getElementById("translated");
-    const logoEl = document.getElementById("logo");
+<div id="quiz-card">
+    <div id="quiz-content">
+        <div class="progress" id="progress">1 / 10</div>
+        <div class="question" id="question">질문이 여기에 표시됩니다.</div>
+        <div class="options" id="options">
+            </div>
+    </div>
 
-    function applyConfig(cfg) {
-      if (!cfg) return;
-      document.documentElement.style.setProperty("--orig-size", (cfg.origSize || 64) + "px");
-      document.documentElement.style.setProperty("--orig-color", cfg.origColor || "#ffffff");
-      document.documentElement.style.setProperty("--orig-font", cfg.origFont || "Arial, sans-serif");
-      document.documentElement.style.setProperty("--trans-size", (cfg.transSize || 68) + "px");
-      document.documentElement.style.setProperty("--trans-color", cfg.transColor || "#ffd166");
-      document.documentElement.style.setProperty("--trans-font", cfg.transFont || "Arial, sans-serif");
-      document.documentElement.style.setProperty("--vertical-padding", (cfg.paddingControl || 24) + "px");
-      if (cfg.logoDataUrl) {
-        logoEl.src = cfg.logoDataUrl;
-        logoEl.style.display = "block";
-      } else {
-        logoEl.style.display = "none";
-      }
+    <div id="result">
+        <h1>경기 종료! 🏟️</h1>
+        <div class="score-text" id="final-score">0점</div>
+        <p class="ceremony-msg" id="comment">평가 메시지</p>
+        <button class="retry-btn" onclick="location.reload()">다시 도전하기</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { q: "정식 야구 경기에서 한 팀의 선발 출전 인원수는?", a: ["8명", "9명", "10명", "11명"], cor: 1 },
+        { q: "메이저리그(MLB)에 한국인 최초로 진출한 투수는?", a: ["류현진", "박찬호", "김병현", "추신수"], cor: 1 },
+        { q: "타자가 안타, 2루타, 3루타, 홈런을 모두 기록하는 것을 무엇이라 하나요?", a: ["그랜드 슬램", "사이클링 히트", "트리플 크라운", "퍼펙트 게임"], cor: 1 },
+        { q: "투수가 한 명의 타자도 출루시키지 않고 승리하는 기록은?", a: ["노히트 노런", "셧아웃", "퍼펙트 게임", "퀄리티 스타트"], cor: 2 },
+        { q: "야구에서 기록지상 'K'는 무엇을 의미하나요?", a: ["안타", "볼넷", "삼진", "도루"], cor: 2 },
+        { q: "지명타자 제도를 영어 약자로 무엇이라고 하나요?", a: ["DH", "SP", "RP", "CP"], cor: 0 },
+        { q: "만루 홈런을 쳤을 때 얻을 수 있는 점수는?", a: ["3점", "4점", "5점", "6점"], cor: 1 },
+        { q: "투수의 방어율을 뜻하는 용어는?", a: ["OPS", "WHIP", "ERA", "WAR"], cor: 2 },
+        { q: "한 이닝에 아웃카운트 3개를 한 번에 잡는 것을 무엇이라 하나요?", a: ["더블 플레이", "트리플 플레이", "언어시스티드 아웃", "포스 아웃"], cor: 1 },
+        { q: "야구에서 '베테랑의 품격'이라 불리며, 홈런/타율/타점 1위를 모두 차지하는 것은?", a: ["트리플 크라운", "골든 글러브", "MVP", "올스타"], cor: 0 }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+
+    function loadQuestion() {
+        if (currentIdx >= questions.length) {
+            showResult();
+            return;
+        }
+
+        const qData = questions[currentIdx];
+        document.getElementById('progress').innerText = `${currentIdx + 1} / ${questions.length}`;
+        document.getElementById('question').innerText = qData.q;
+        
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+        
+        qData.a.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(index);
+            optionsDiv.appendChild(btn);
+        });
     }
 
-    function applyPayload(payload) {
-      if (!payload) return;
-      if (payload.original !== undefined) {
-        originalEl.textContent = payload.original;
-      }
-      if (payload.translated !== undefined) {
-        translatedEl.textContent = payload.translated;
-      }
+    function checkAnswer(selected) {
+        if (selected === questions[currentIdx].cor) {
+            score += 10;
+        }
+        currentIdx++;
+        loadQuestion();
     }
 
-    function loadFromStorage() {
-      try {
-        const cfgRaw = localStorage.getItem(LS_CONFIG_KEY);
-        if (cfgRaw) applyConfig(JSON.parse(cfgRaw));
-        const payRaw = localStorage.getItem(LS_PAYLOAD_KEY);
-        if (payRaw) applyPayload(JSON.parse(payRaw));
-      } catch (e) {
-        console.error("로컬스토리지 읽기 오류", e);
-      }
+    function showResult() {
+        document.getElementById('quiz-content').style.display = 'none';
+        const resDiv = document.getElementById('result');
+        resDiv.style.display = 'block';
+        
+        document.getElementById('final-score').innerText = `${score}점`;
+        
+        let comment = "";
+        if (score === 100) {
+            comment = "⚾ 대단합니다! 당신은 명예의 전당급 야구 전문가군요!";
+            fireworks();
+        } else if (score >= 70) {
+            comment = "⚾ 훌륭한 안타입니다! 야구 좀 보시는군요?";
+            fireworks(2);
+        } else if (score >= 40) {
+            comment = "⚾ 번트 안타 성공! 조금만 더 공부하면 주전입니다.";
+        } else {
+            comment = "⚾ 삼진 아웃! 다음 타석(재도전)을 기약하세요.";
+        }
+        document.getElementById('comment').innerText = comment;
     }
 
-    window.addEventListener("storage", (event) => {
-      if (event.key === LS_CONFIG_KEY && event.newValue) {
-        applyConfig(JSON.parse(event.newValue));
-      }
-      if (event.key === LS_PAYLOAD_KEY && event.newValue) {
-        applyPayload(JSON.parse(event.newValue));
-      }
-    });
+    function fireworks(times = 5) {
+        const duration = 3 * 1000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
-    loadFromStorage();
-  </script>
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        const interval = setInterval(function() {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            const particleCount = 50 * (timeLeft / duration);
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
+    }
+
+    loadQuestion();
+</script>
+
 </body>
 </html>
